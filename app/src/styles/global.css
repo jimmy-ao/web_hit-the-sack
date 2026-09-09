@@ -1,0 +1,185 @@
+/* Arch'n'Ops type stack — must precede all other rules per CSS spec */
+
+@import '@fontsource/inter-tight/latin-300.css';
+@import '@fontsource/inter-tight/latin-400.css';
+@import '@fontsource/inter-tight/latin-500.css';
+@import '@fontsource/space-grotesk/latin-300.css';
+@import '@fontsource/space-grotesk/latin-400.css';
+@import '@fontsource/space-grotesk/latin-500.css';
+@import '@fontsource/jetbrains-mono/latin-400.css';
+@import '@fontsource/jetbrains-mono/latin-500.css';
+
+@import "tailwindcss";
+
+/*
+  Arch'n'Ops palette over the dynamic sky background.
+  The sky gradient provides the day/night mood; UI vars are tuned
+  for readability on top of it (glass cards, light text).
+*/
+:root {
+  --text: #fbfaf6;                          /* paper on sky */
+  --muted: rgba(251, 250, 246, 0.62);
+  --faint: rgba(251, 250, 246, 0.55);
+  --card:  rgba(10, 22, 40, 0.8);
+  --card-border: rgba(216, 219, 227, 0.18);
+  --blue: #2563eb;                           /* blue-bright reads better on dark */
+  --blue-wash: rgba(37, 99, 235, 0.18);
+  --orange: #ff8a3d;                         /* orange-soft for dark bg */
+  --orange-strong: #f26a1f;
+  --orange-wash: rgba(255, 138, 61, 0.16);
+}
+
+html, body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fadeUp 0.7s ease both; }
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(242, 106, 31, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(242, 106, 31, 0); }
+}
+
+@keyframes pulseOrb {
+  0%, 100% {
+    box-shadow:
+      0 0 40px 20px rgba(255,190,77,0.5),
+      0 0 80px 40px rgba(255,140,66,0.3),
+      0 0 120px 60px rgba(255,100,50,0.15);
+  }
+  50% {
+    box-shadow:
+      0 0 55px 28px rgba(255,190,77,0.6),
+      0 0 110px 55px rgba(255,140,66,0.35),
+      0 0 160px 75px rgba(255,100,50,0.2);
+  }
+}
+
+@keyframes twinkle {
+  from { opacity: 0.15; transform: scale(0.8); }
+  to   { opacity: 1;    transform: scale(1.2); }
+}
+
+.orb-glow {
+  box-shadow:
+    0 0 40px 20px rgba(255,190,77,0.5),
+    0 0 80px 40px rgba(255,140,66,0.3),
+    0 0 120px 60px rgba(255,100,50,0.15);
+  animation: pulseOrb 4s ease-in-out infinite;
+  transition: background 60s ease;
+}
+
+.star {
+  position: absolute;
+  border-radius: 50%;
+  background: white;
+  animation: twinkle var(--dur, 3s) ease-in-out infinite alternate;
+}
+
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #cfe0ff;
+  padding: 7px 14px;
+  background: var(--blue-wash);
+  border: 1px solid rgba(37, 99, 235, 0.3);
+  border-radius: 100px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.kicker .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--orange);
+  animation: pulse 2s infinite;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: border-color 0.3s ease;
+}
+.card:hover { border-color: rgba(216, 219, 227, 0.35); }
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: #fbfaf6;
+  background: var(--blue);
+  border: none;
+  padding: 12px 22px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+.btn-primary:hover { transform: translateY(-1px); background: #1e40af; }
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid rgba(251, 250, 246, 0.45);
+  padding: 12px 22px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.btn-ghost:hover { background: var(--text); color: #0a1628; }
+
+.btn-primary:focus-visible,
+.btn-ghost:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 3px;
+}
+
+.mono-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--faint);
+}
+
+.spinner {
+  width: 2.5rem; height: 2.5rem;
+  border: 2px solid var(--blue-wash);
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+  margin: 0 auto 1rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

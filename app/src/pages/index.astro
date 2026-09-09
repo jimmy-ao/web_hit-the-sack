@@ -1,0 +1,580 @@
+---
+import '../styles/global.css';
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hit the Sack</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="description" content="Sunset and sunrise times computed for exactly where you are. No cookies, no tracking." />
+  <link rel="canonical" href="https://hitthesack.archnops.com/" />
+  <meta property="og:title" content="Hit the Sack" />
+  <meta property="og:description" content="Sunset and sunrise times for exactly where you are." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://hitthesack.archnops.com/" />
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center relative"
+      style="font-family: var(--font-body);">
+
+  <!-- Dynamic sky background -->
+  <div id="sky" class="fixed inset-0 z-0" style="transition: background 60s ease;"></div>
+  <div id="stars" class="fixed inset-0 z-[1] pointer-events-none"></div>
+  <div id="horizon-glow" class="fixed bottom-0 left-0 right-0 h-[35%] z-[1] pointer-events-none"></div>
+
+  <!-- Sun / moon orb -->
+  <div class="fixed left-1/2 -translate-x-1/2 z-[2] pointer-events-none" style="bottom:8%;">
+    <div id="orb" class="w-20 h-20 rounded-full orb-glow"></div>
+  </div>
+
+  <!-- Mountains silhouette -->
+  <div class="fixed bottom-0 left-0 right-0 h-[22%] z-[3] pointer-events-none">
+    <svg viewBox="0 0 1440 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full">
+      <path d="M0,200 L0,120 L80,60 L160,100 L260,30 L360,90 L440,50 L520,100 L600,40 L700,80 L780,20 L860,75 L940,35 L1020,85 L1100,50 L1180,90 L1260,45 L1360,95 L1440,60 L1440,200 Z" fill="rgba(5,0,15,0.85)" />
+      <path d="M0,200 L0,155 L100,130 L200,150 L320,115 L440,140 L560,120 L680,145 L800,125 L920,150 L1040,130 L1160,155 L1280,135 L1440,160 L1440,200 Z" fill="rgba(5,0,15,0.95)" />
+    </svg>
+  </div>
+
+  <main class="relative z-10 w-full max-w-xl px-6 py-12 text-center">
+
+    <!-- Logo mark: orange sun, blue horizon -->
+    <div class="fade-up mx-auto mb-7" style="width:56px;height:56px;">
+      <svg viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;">
+        <path id="mark-sun" d="M14 33 a14 14 0 0 1 28 0 Z" fill="var(--orange-strong)" style="transition: transform 2s ease;"/>
+        <rect x="8" y="36" width="40" height="3" rx="1.5" fill="var(--blue)"/>
+      </svg>
+    </div>
+
+    <div class="fade-up mb-6" style="animation-delay:0.1s;">
+      <span class="kicker"><span class="dot"></span>Hit the Sack</span>
+    </div>
+
+    <h1 class="fade-up text-[clamp(2.3rem,7vw,3.8rem)] leading-[1.08] mb-5"
+        style="font-family:var(--font-display);font-weight:400;letter-spacing:-0.03em;color:var(--text);text-shadow:0 2px 30px rgba(0,0,0,0.35);animation-delay:0.15s;">
+      Time to <em style="color:var(--orange);font-style:italic;font-weight:300;">hit the sack</em>?
+    </h1>
+
+    <p class="fade-up text-[1.05rem] leading-relaxed mb-10"
+       style="color:var(--muted);max-width:420px;margin-left:auto;margin-right:auto;animation-delay:0.2s;">
+      Sunset and sunrise, computed for exactly where you are.
+    </p>
+
+    <div id="content" aria-live="polite" aria-atomic="true">
+
+      <!-- IDLE -->
+      <div id="state-idle" class="fade-up" style="animation-delay:0.25s;">
+        <div class="card px-7 py-7 mx-auto" style="max-width:430px;text-align:left;">
+          <p class="mono-label" style="margin-bottom:0.9rem;">§ Location required</p>
+          <p style="color:var(--muted);font-size:0.9rem;line-height:1.65;margin-bottom:0.5rem;">
+            Hit the Sack uses your device location to calculate precise solar times.
+            Your rounded coordinates are sent to OpenStreetMap to look up a city name. Nothing is stored.
+          </p>
+          <p style="color:var(--faint);font-size:0.8rem;margin-bottom:1.5rem;">
+            When prompted by your browser, tap <strong style="color:var(--muted);">Allow</strong> to continue.
+          </p>
+          <button id="btn-locate" class="btn-primary" style="width:100%;">
+            Show my solar times <span>→</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- LOADING -->
+      <div id="state-loading" role="status" style="display:none;">
+        <div class="spinner"></div>
+        <p style="color:var(--muted);font-size:0.875rem;font-family:var(--font-mono);" id="loading-msg">Locating your position…</p>
+      </div>
+
+      <!-- SUCCESS -->
+      <div id="state-result" style="display:none;"></div>
+
+      <!-- DENIED -->
+      <div id="state-denied" style="display:none;">
+        <div class="card px-7 py-7 mx-auto" style="max-width:450px;text-align:left;">
+          <p class="mono-label" style="margin-bottom:0.9rem;color:var(--orange);">§ Permission blocked</p>
+          <p style="font-family:var(--font-display);font-size:1.3rem;font-weight:500;letter-spacing:-0.015em;color:var(--text);margin-bottom:0.6rem;">
+            Location access is blocked
+          </p>
+          <p style="color:var(--muted);font-size:0.88rem;line-height:1.7;margin-bottom:1.25rem;">
+            Hit the Sack needs your location to calculate sunset and sunrise. It's used on your device, 
+            and rounded coordinates are sent to OpenStreetMap only to name your city.
+            Click the <strong style="color:var(--text);">lock icon</strong> in your browser's address bar,
+            set Location to <strong style="color:var(--text);">Allow</strong>, then reload.
+          </p>
+          <div style="border-top:1px solid var(--card-border);padding-top:1.1rem;margin-bottom:1.4rem;">
+            <p class="mono-label" style="margin-bottom:0.6rem;">Quick guide</p>
+            <p style="color:var(--muted);font-size:0.82rem;line-height:1.9;">
+              <strong style="color:var(--text);">Chrome / Edge:</strong> lock icon → Site settings → Location → Allow<br/>
+              <strong style="color:var(--text);">Firefox:</strong> lock icon → Connection secure → More info → Permissions<br/>
+              <strong style="color:var(--text);">Safari:</strong> Settings → Safari → Location → Allow
+            </p>
+          </div>
+          <button id="btn-reload" class="btn-primary">Reload page</button>
+        </div>
+      </div>
+
+      <!-- TIMEOUT -->
+      <div id="state-timeout" style="display:none;">
+        <div class="card px-7 py-7 mx-auto" style="max-width:450px;text-align:left;">
+          <p class="mono-label" style="margin-bottom:0.9rem;color:var(--orange);">§ Timeout</p>
+          <p style="font-family:var(--font-display);font-size:1.3rem;font-weight:500;letter-spacing:-0.015em;color:var(--text);margin-bottom:0.6rem;">
+            Location request timed out
+          </p>
+          <p style="color:var(--muted);font-size:0.88rem;line-height:1.7;margin-bottom:1.1rem;">
+            Your device took too long to find your position. This is usually temporary —
+            GPS warming up, Wi-Fi disabled, or a VPN. Try:
+          </p>
+          <ul style="color:var(--muted);font-size:0.85rem;line-height:2;margin-bottom:1.4rem;padding-left:0;list-style:none;">
+            <li><span style="color:var(--orange);">→</span> &nbsp;Enable Wi-Fi (improves accuracy)</li>
+            <li><span style="color:var(--orange);">→</span> &nbsp;Disable VPN if one is active</li>
+            <li><span style="color:var(--orange);">→</span> &nbsp;On mobile, enable GPS in settings</li>
+          </ul>
+          <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+            <button id="btn-retry-timeout" class="btn-primary">Try again</button>
+            <button id="btn-retry-low" class="btn-ghost">Try with lower accuracy</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- UNAVAILABLE -->
+      <div id="state-unavailable" style="display:none;">
+        <div class="card px-7 py-7 mx-auto" style="max-width:450px;text-align:left;">
+          <p class="mono-label" style="margin-bottom:0.9rem;color:var(--orange);">§ Unavailable</p>
+          <p style="font-family:var(--font-display);font-size:1.3rem;font-weight:500;letter-spacing:-0.015em;color:var(--text);margin-bottom:0.6rem;">Position unavailable</p>
+          <p style="color:var(--muted);font-size:0.88rem;line-height:1.7;margin-bottom:1.4rem;">
+            Your device couldn't determine your position. This can happen on desktop without Wi-Fi,
+            or when location services are disabled at the OS level.
+          </p>
+          <button id="btn-retry-unavailable" class="btn-primary">Try again</button>
+        </div>
+      </div>
+
+      <!-- HTTPS ERROR -->
+      <div id="state-insecure" style="display:none;">
+        <div class="card px-7 py-6 mx-auto" style="max-width:450px;text-align:left;">
+          <p class="mono-label" style="margin-bottom:0.9rem;color:var(--orange);">§ Insecure origin</p>
+          <p style="font-family:var(--font-display);font-size:1.3rem;font-weight:500;color:var(--text);margin-bottom:0.5rem;">HTTPS required</p>
+          <p style="color:var(--muted);font-size:0.88rem;line-height:1.7;">
+            The Geolocation API only works on secure connections. Make sure you're visiting
+            <strong style="color:var(--text);">https://</strong>.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <noscript>
+    <p>Hit the Sack needs JavaScript to read your location and compute solar times.</p>
+  </noscript>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════════════════
+    //  DYNAMIC SKY — gradient keyframes by hour (the original background)
+    // ═══════════════════════════════════════════════════════════════════════
+    const SKY_KEYFRAMES: Record<number, { stops: string[], glow: string, orb: string, stars: number }> = {
+      0:  { stops: ['#000005','#05001a','#0a0028','#0d0035','#100040'], glow: 'rgba(80,40,160,0.25)',  orb: 'radial-gradient(circle at 40% 40%, #e8e8ff, #c8c8f0 50%, #9090c0)', stars: 1    },
+      3:  { stops: ['#000005','#04001a','#080025','#0c0032','#0f003d'], glow: 'rgba(60,20,120,0.2)',   orb: 'radial-gradient(circle at 40% 40%, #e8e8ff, #c0c0e8 50%, #8888b8)', stars: 1    },
+      5:  { stops: ['#050010','#150530','#2a0a50','#5a1a6a','#c0404a'], glow: 'rgba(200,80,80,0.4)',   orb: 'radial-gradient(circle at 38% 38%, #fff0e0, #ffcc88 50%, #ff8844)', stars: 0.4  },
+      7:  { stops: ['#0d1b2a','#1b3a5c','#2e6da4','#f4a261','#e76f51'], glow: 'rgba(244,162,97,0.5)',  orb: 'radial-gradient(circle at 38% 38%, #fff9e6, #ffdd88 50%, #ffaa44)', stars: 0.05 },
+      9:  { stops: ['#1a3a5c','#2255aa','#3a88dd','#60aaee','#88ccff'], glow: 'rgba(100,180,255,0.3)', orb: 'radial-gradient(circle at 38% 38%, #ffffff, #fffde0 50%, #ffee99)', stars: 0    },
+      12: { stops: ['#0a2a5a','#1a55cc','#2277ee','#44aaff','#77ccff'], glow: 'rgba(120,200,255,0.25)',orb: 'radial-gradient(circle at 38% 38%, #ffffff, #fffef0 50%, #ffff88)', stars: 0    },
+      16: { stops: ['#1a3050','#2255aa','#4488cc','#77aadd','#aaccee'], glow: 'rgba(100,160,220,0.3)', orb: 'radial-gradient(circle at 38% 38%, #fffff0, #ffee88 50%, #ffcc44)', stars: 0    },
+      18: { stops: ['#0a1525','#1a2a40','#3a2a50','#c05a20','#ff9933'], glow: 'rgba(255,140,50,0.5)',  orb: 'radial-gradient(circle at 38% 38%, #fff9e6, #ffbe4d 50%, #ff8c42)', stars: 0.1  },
+      20: { stops: ['#080020','#180535','#3d1060','#8b2fc9','#ff6b35'], glow: 'rgba(255,107,53,0.45)', orb: 'radial-gradient(circle at 38% 38%, #fff9e6, #ffbe4d 50%, #ff8c42)', stars: 0.5  },
+      22: { stops: ['#04000f','#0a0020','#150030','#1a0038','#200042'], glow: 'rgba(100,50,180,0.3)',  orb: 'radial-gradient(circle at 40% 40%, #e8e8ff, #c8c8f0 50%, #9090c0)', stars: 0.85 },
+      24: { stops: ['#000005','#05001a','#0a0028','#0d0035','#100040'], glow: 'rgba(80,40,160,0.25)',  orb: 'radial-gradient(circle at 40% 40%, #e8e8ff, #c8c8f0 50%, #9090c0)', stars: 1    },
+    };
+
+    function hexToRgb(hex: string) {
+      const n = parseInt(hex.replace('#',''), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+    function lerpColor(a: string, b: string, t: number) {
+      const [r1,g1,b1] = hexToRgb(a), [r2,g2,b2] = hexToRgb(b);
+      return `#${[r1+(r2-r1)*t, g1+(g2-g1)*t, b1+(b2-b1)*t].map(v => Math.round(v).toString(16).padStart(2,'0')).join('')}`;
+    }
+    function lerpNum(a: number, b: number, t: number) { return a + (b - a) * t; }
+
+    function skyForHour(decimalHour: number) {
+      const keys = Object.keys(SKY_KEYFRAMES).map(Number).sort((a,b) => a-b);
+      let lo = keys[0], hi = keys[keys.length-1];
+      for (let i = 0; i < keys.length-1; i++) {
+        if (decimalHour >= keys[i] && decimalHour <= keys[i+1]) { lo = keys[i]; hi = keys[i+1]; break; }
+      }
+      const t = (decimalHour - lo) / (hi - lo);
+      const kLo = SKY_KEYFRAMES[lo], kHi = SKY_KEYFRAMES[hi];
+      const stops = kLo.stops.map((c, i) => lerpColor(c, kHi.stops[i], t));
+      const pcts = ['0%','25%','50%','75%','100%'];
+      return {
+        gradient: `linear-gradient(180deg, ${stops.map((c,i) => `${c} ${pcts[i]}`).join(', ')})`,
+        starOpacity: lerpNum(kLo.stars, kHi.stars, t),
+        orb: t < 0.5 ? kLo.orb : kHi.orb,
+        glow: t < 0.5 ? kLo.glow : kHi.glow,
+      };
+    }
+
+    function applySky() {
+      const now = new Date();
+      const t = now.getHours() + now.getMinutes() / 60;
+      const { gradient, starOpacity, orb, glow } = skyForHour(t);
+      document.getElementById('sky')!.style.background = gradient;
+      document.getElementById('stars')!.style.opacity = starOpacity.toString();
+      document.getElementById('orb')!.style.background = orb;
+      document.getElementById('horizon-glow')!.style.background =
+        `radial-gradient(ellipse 80% 100% at 50% 100%, ${glow} 0%, transparent 70%)`;
+
+      // Logo sun dips below the horizon at night (using star opacity as darkness proxy)
+      const sun = document.getElementById('mark-sun');
+      if (sun) sun.setAttribute('transform', `translate(0 ${starOpacity * 10})`);
+    }
+
+    const starsEl = document.getElementById('stars')!;
+    for (let i = 0; i < 120; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      const size = Math.random() * 2.5 + 0.5;
+      s.style.cssText = `width:${size}px;height:${size}px;top:${Math.random()*65}%;left:${Math.random()*100}%;--dur:${(Math.random()*3+2).toFixed(1)}s;animation-delay:${(Math.random()*4).toFixed(1)}s;`;
+      starsEl.appendChild(s);
+    }
+
+    applySky();
+    setInterval(applySky, 60_000);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  SOLAR CALCULATION — NOAA sunrise equation (Julian cycle method)
+    //  UTC Date objects; browser handles timezone + DST. ±1 min below ±72°.
+    // ═══════════════════════════════════════════════════════════════════════
+    const DEG = Math.PI / 180;
+
+    // Solar altitude thresholds, in degrees below the horizon.
+    // -0.833° accounts for atmospheric refraction plus the sun's apparent radius.
+    const ALT_SUNRISE_SUNSET = -0.833;
+
+    // Generalised NOAA routine: returns the times the sun crosses `altitude`
+    // on the way up (rise) and down (set). Returns null when the sun never
+    // reaches that altitude on the given date — normal at high latitudes,
+    // where e.g. astronomical twilight simply never ends in midsummer.
+    function solarTimes(lat: number, lng: number, date: Date, altitude: number): { rise: Date, set: Date } | null {
+      const J2000 = 2451545.0;
+      const jd = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000 + 2440587.5;
+      // jd is midnight UTC; + 0.5 moves to noon so the rounding lands on the
+      // local-noon transit of *this* date. Without it, every longitude west of
+      // ~0.3°E rounds down a day and the page shows yesterday's sun.
+      const n = Math.round(jd + 0.5 - J2000 - 0.0009 + lng / 360);
+      const Jstar = J2000 + 0.0009 - lng / 360 + n;
+      const M = ((357.5291 + 0.98560028 * (Jstar - J2000)) % 360 + 360) % 360;
+      const C = 1.9148*Math.sin(M*DEG) + 0.0200*Math.sin(2*M*DEG) + 0.0003*Math.sin(3*M*DEG);
+      const lambda = ((M + C + 180 + 102.9372) % 360 + 360) % 360;
+      const Jtransit = Jstar + 0.0053*Math.sin(M*DEG) - 0.0069*Math.sin(2*lambda*DEG);
+      const sinDec = Math.sin(lambda*DEG) * Math.sin(23.4397*DEG);
+      const cosDec = Math.cos(Math.asin(sinDec));
+      const cosH = (Math.sin(altitude*DEG) - Math.sin(lat*DEG)*sinDec) / (Math.cos(lat*DEG)*cosDec);
+      if (cosH > 1 || cosH < -1) return null;
+      const H = Math.acos(cosH) / DEG;
+      const jdToDate = (j: number) => new Date((j - 2440587.5) * 86400000);
+      return { rise: jdToDate(Jtransit - H/360), set: jdToDate(Jtransit + H/360) };
+    }
+
+    function computeSunTimes(lat: number, lng: number, date: Date): { sunrise: Date, sunset: Date } | null {
+      const t = solarTimes(lat, lng, date, ALT_SUNRISE_SUNSET);
+      return t ? { sunrise: t.rise, sunset: t.set } : null;
+    }
+
+    // The night's phases, in order. Each one *ends* when the sun crosses the
+    // given altitude on its way down: sunset at -0.833°, civil twilight at
+    // -6°, nautical at -12°, astronomical at -18°. Astronomical night is the
+    // exception — it runs from -18° tonight until the sun climbs back up to
+    // -18° tomorrow morning, so it ends on the way *up* (see buildNightPhases).
+    const NIGHT_PHASES = [
+      {
+        key: 'sunset',
+        label: 'Sunset',
+        altitude: ALT_SUNRISE_SUNSET,
+        swatch: 'linear-gradient(180deg,#ffd08a,#ef7326)',
+        blurb: 'The upper edge of the disc slips below the horizon. Refraction lifts the sun by roughly half a degree, so it is geometrically already gone by the time you see it set.',
+      },
+      {
+        key: 'civil',
+        label: 'Civil twilight',
+        altitude: -6,
+        swatch: 'linear-gradient(180deg,#f4a261,#c05a20)',
+        blurb: 'Still bright enough to read outdoors and tell colours apart. The brightest planets and stars come out as the sky turns deep blue.',
+      },
+      {
+        key: 'nautical',
+        label: 'Nautical twilight',
+        altitude: -12,
+        swatch: 'linear-gradient(180deg,#8b2fc9,#3d1060)',
+        blurb: 'Colour is gone and the landscape is silhouette, but the sea horizon stays visible — the window sailors used to shoot stars with a sextant.',
+      },
+      {
+        key: 'astronomical',
+        label: 'Astronomical twilight',
+        altitude: -18,
+        swatch: 'linear-gradient(180deg,#150030,#04000f)',
+        blurb: 'Night to the naked eye. A residual glow you cannot see still washes out the faintest galaxies and nebulae.',
+      },
+      {
+        key: 'night',
+        label: 'Astronomical night',
+        altitude: null,
+        swatch: 'linear-gradient(180deg,#04000f,#000000)',
+        blurb: 'The sun stops lighting the sky altogether. What is left comes from the moon, light pollution, aurorae and zodiacal light — the darkest the sky gets here.',
+      },
+    ];
+
+    function fmtTime(d: Date) {
+      return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    }
+    function fmtDuration(ms: number) {
+      const m = Math.round(ms / 60000);
+      return `${Math.floor(m / 60)}h ${m % 60}m`;
+    }
+
+    // ── Night phases ──────────────────────────────────────
+    // All content here is from NIGHT_PHASES, a local constant — no untrusted
+    // input reaches this markup.
+
+    // Resolves every phase to a start/end pair for tonight. `end` is null when
+    // the sun never gets low enough for that phase to finish — normal at high
+    // latitudes around midsummer — and once one phase fails to end, none of the
+    // later ones can either.
+    function buildNightPhases(lat: number, lng: number, date: Date, sunset: Date) {
+      const tomorrow = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+      const dawn = solarTimes(lat, lng, tomorrow, -18);
+      let from: Date | null = null;
+      let broken = false;
+
+      return NIGHT_PHASES.map(phase => {
+        let end: Date | null = null;
+        if (broken) {
+          end = null;
+        } else if (phase.key === 'sunset') {
+          end = sunset;
+        } else if (phase.key === 'night') {
+          // Ends on the upward crossing of -18°, i.e. tomorrow's astronomical dawn.
+          end = dawn ? dawn.rise : null;
+        } else {
+          const t = solarTimes(lat, lng, date, phase.altitude as number);
+          end = t ? t.set : null;
+        }
+        if (!end) broken = true;
+        const start = from;
+        if (end) from = end;
+        return { ...phase, start, end };
+      });
+    }
+
+    function nightPhasesHTML(lat: number, lng: number, date: Date, sunset: Date): string {
+      const phases = buildNightPhases(lat, lng, date, sunset);
+      const complete = phases.every(p => p.end !== null);
+
+      const rows = phases.map((phase, i) => {
+        const divider = i < phases.length - 1
+          ? 'border-bottom:1px solid var(--card-border);' : '';
+
+        const time = phase.end
+          ? `
+              <p style="font-family:var(--font-display);font-size:1.15rem;font-weight:500;color:var(--text);line-height:1.25;white-space:nowrap;">${fmtTime(phase.end)}</p>
+              ${phase.start ? `<p style="font-family:var(--font-mono);font-size:0.67rem;letter-spacing:0.04em;color:var(--faint);white-space:nowrap;">from ${fmtTime(phase.start)}</p>` : ''}
+            `
+          : `
+              <p style="font-family:var(--font-mono);font-size:0.67rem;letter-spacing:0.04em;color:var(--faint);line-height:1.6;">never<br/>${phase.key === 'night' ? 'begins' : 'ends'}</p>
+            `;
+
+        return `
+        <div style="display:flex;gap:0.85rem;align-items:flex-start;padding:0.9rem 0;${divider}">
+          <span aria-hidden="true" style="flex:0 0 auto;width:11px;height:11px;border-radius:50%;margin-top:0.3rem;background:${phase.swatch};box-shadow:0 0 0 1px var(--card-border);"></span>
+          <div style="flex:1 1 auto;min-width:0;">
+            <p style="font-family:var(--font-display);font-size:1rem;font-weight:500;letter-spacing:-0.01em;color:var(--text);margin-bottom:0.2rem;">${phase.label}</p>
+            <p style="color:var(--muted);font-size:0.82rem;line-height:1.6;">${phase.blurb}</p>
+          </div>
+          <div style="flex:0 0 auto;text-align:right;padding-left:0.25rem;">
+            ${time}
+          </div>
+        </div>`;
+      }).join('');
+
+      const note = complete
+        ? `Each phase ends as the sun passes 0.8°, 6°, 12° and 18° below the horizon. Astronomical night lasts until it climbs back to 18° at dawn.`
+        : `At your latitude the sun stays too high tonight for every phase to complete — the sky never fully darkens.`;
+
+      return `
+        <div class="card px-5 py-4 mb-4 fade-up mx-auto" style="max-width:450px;text-align:left;animation-delay:0.35s;">
+          <p class="mono-label" style="margin-bottom:0.35rem;">§ Tonight, phase by phase</p>
+          ${rows}
+          <p style="border-top:1px solid var(--card-border);padding-top:0.8rem;margin-top:0.2rem;color:var(--faint);font-size:0.76rem;line-height:1.6;">${note}</p>
+        </div>`;
+    }
+
+    // ── Sun arc visualization ────────────────────────────────────────────────
+    function sunArcSVG(sunrise: Date, sunset: Date, now: Date): string {
+      const W = 400, H = 150, HORIZON = 118;
+      const P0 = { x: 46,  y: HORIZON };
+      const P2 = { x: 354, y: HORIZON };
+      const P1 = { x: W / 2, y: 8 };
+
+      const span = sunset.getTime() - sunrise.getTime();
+      let f = (now.getTime() - sunrise.getTime()) / span;
+      const daytime = f >= 0 && f <= 1;
+      f = Math.max(0, Math.min(1, f));
+
+      const bez = (t: number) => ({
+        x: (1-t)*(1-t)*P0.x + 2*(1-t)*t*P1.x + t*t*P2.x,
+        y: (1-t)*(1-t)*P0.y + 2*(1-t)*t*P1.y + t*t*P2.y,
+      });
+      const sun = bez(f);
+      const fmtShort = (d: Date) => d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+
+      return `
+      <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+        <rect x="0" y="${HORIZON}" width="${W}" height="${H - HORIZON}" fill="rgba(37,99,235,0.12)" />
+        <line x1="0" y1="${HORIZON}" x2="${W}" y2="${HORIZON}" stroke="var(--card-border)" stroke-width="1.5"/>
+        <path d="M ${P0.x} ${P0.y} Q ${P1.x} ${P1.y} ${P2.x} ${P2.y}"
+              fill="none" stroke="rgba(251,250,246,0.85)" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="${P0.x}" y1="46" x2="${P0.x}" y2="${HORIZON - 6}" stroke="var(--card-border)" stroke-width="1.5" stroke-dasharray="2 5"/>
+        <line x1="${P2.x}" y1="46" x2="${P2.x}" y2="${HORIZON - 6}" stroke="var(--card-border)" stroke-width="1.5" stroke-dasharray="2 5"/>
+        <circle cx="${P0.x}" cy="${P0.y}" r="5" fill="rgba(251,250,246,0.9)"/>
+        <circle cx="${P2.x}" cy="${P2.y}" r="5" fill="rgba(251,250,246,0.9)"/>
+        <text x="${P0.x}" y="20" text-anchor="middle" style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;" fill="var(--faint)">SUNRISE</text>
+        <text x="${P0.x}" y="40" text-anchor="middle" style="font-family:var(--font-display);font-size:17px;font-weight:500;" fill="var(--text)">${fmtShort(sunrise)}</text>
+        <text x="${P2.x}" y="20" text-anchor="middle" style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;" fill="var(--faint)">SUNSET</text>
+        <text x="${P2.x}" y="40" text-anchor="middle" style="font-family:var(--font-display);font-size:17px;font-weight:500;" fill="var(--text)">${fmtShort(sunset)}</text>
+        ${daytime ? `
+        <circle cx="${sun.x.toFixed(1)}" cy="${sun.y.toFixed(1)}" r="16" fill="var(--orange-wash)"/>
+        <circle cx="${sun.x.toFixed(1)}" cy="${sun.y.toFixed(1)}" r="6.5" fill="var(--orange)"/>` : `
+        <circle cx="${f < 0.5 ? P0.x : P2.x}" cy="${HORIZON + 16}" r="6.5" fill="var(--faint)"/>`}
+      </svg>`;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  STATE MACHINE + APP LOGIC
+    // ═══════════════════════════════════════════════════════════════════════
+    type State = 'idle' | 'loading' | 'result' | 'denied' | 'timeout' | 'unavailable' | 'insecure';
+    function showState(s: State) {
+      ['idle','loading','result','denied','timeout','unavailable','insecure'].forEach(id => {
+        document.getElementById(`state-${id}`)!.style.display = id === s ? '' : 'none';
+      });
+    }
+
+    // ── Reverse geocoding ────────────────────────────────────────────────────
+    // Place names come from OpenStreetMap, which is community-editable — anyone
+    // can rename a place. Treat the response as untrusted input: validate it
+    // here, and never interpolate it into HTML (see renderResult, which writes
+    // the name with textContent).
+    const PLACE_NAME_RE = /^[\p{L}\p{M}\p{N}\s'’.,()\/-]{1,80}$/u;
+    const FALLBACK_PLACE = 'Unknown location';
+
+    function sanitizePlaceName(value: unknown): string {
+      if (typeof value !== 'string') return FALLBACK_PLACE;
+      const name = value.trim();
+      return PLACE_NAME_RE.test(name) ? name : FALLBACK_PLACE;
+    }
+
+    async function geocode(lat: number, lng: number): Promise<string> {
+      try {
+        const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat.toFixed(2)}&lon=${lng.toFixed(2)}&zoom=10&format=json`);
+        if (!r.ok) return FALLBACK_PLACE;
+        const d = await r.json();
+        const a = d?.address;
+        if (!a || typeof a !== 'object') return FALLBACK_PLACE;
+        return sanitizePlaceName(a.city || a.town || a.village || a.county || a.state);
+      } catch { return FALLBACK_PLACE; }
+    }
+
+    const sunsetSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:1.6rem;height:1.6rem;"><line x1="12" y1="2" x2="12" y2="4"/><line x1="19.07" y1="4.93" x2="17.66" y2="6.34"/><line x1="22" y1="12" x2="20" y2="12"/><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/><line x1="2" y1="12" x2="4" y2="12"/><path d="M5 12a7 7 0 0 1 14 0"/><line x1="2" y1="17" x2="22" y2="17"/><polyline points="9 21 12 18 15 21"/></svg>`;
+    const sunriseSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:1.6rem;height:1.6rem;"><line x1="12" y1="2" x2="12" y2="4"/><line x1="19.07" y1="4.93" x2="17.66" y2="6.34"/><line x1="22" y1="12" x2="20" y2="12"/><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/><line x1="2" y1="12" x2="4" y2="12"/><path d="M5 12a7 7 0 0 1 14 0"/><line x1="2" y1="17" x2="22" y2="17"/><polyline points="9 14 12 11 15 14"/></svg>`;
+
+    // The only untrusted value on the page. Written as text, never as HTML —
+    // markup in a place name is rendered literally instead of being parsed.
+    function setPlaceName(name: string) {
+      const el = document.getElementById('place-name');
+      if (el) el.textContent = name;
+    }
+
+    async function renderResult(lat: number, lng: number) {
+      document.getElementById('loading-msg')!.textContent = 'Fetching solar data…';
+      const now = new Date();
+      const city = await geocode(lat, lng);
+      const times = computeSunTimes(lat, lng, now);
+      const dateStr = now.toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+      const result = document.getElementById('state-result')!;
+
+      if (!times) {
+        result.innerHTML = `<div class="card px-7 py-6 mx-auto" style="max-width:450px;"><p id="place-name" style="font-family:var(--font-display);font-size:1.4rem;font-weight:500;color:var(--text);"></p><p style="color:var(--muted);margin-top:0.5rem;font-size:0.9rem;">Polar conditions — no regular sunrise or sunset today.</p></div>`;
+        setPlaceName(city);
+        showState('result'); return;
+      }
+
+      const sunsetStr  = fmtTime(times.sunset);
+      const sunriseStr = fmtTime(times.sunrise);
+      const dayLenStr  = fmtDuration(times.sunset.getTime() - times.sunrise.getTime());
+
+      result.innerHTML = `
+        <div class="card px-7 py-5 mb-4 fade-up mx-auto" style="max-width:450px;text-align:left;">
+          <p class="mono-label" style="margin-bottom:0.4rem;">§ Position</p>
+          <p id="place-name" style="font-family:var(--font-display);font-size:1.5rem;font-weight:500;letter-spacing:-0.015em;color:var(--text);margin-bottom:0.2rem;"></p>
+          <p style="font-family:var(--font-mono);font-size:0.75rem;letter-spacing:0.04em;color:var(--faint);">
+            ${lat.toFixed(5)}°, ${lng.toFixed(5)}°
+          </p>
+        </div>
+
+        <div class="card px-5 py-5 mb-4 fade-up mx-auto" style="max-width:450px;animation-delay:0.05s;">
+          ${sunArcSVG(times.sunrise, times.sunset, now)}
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:450px;margin:0 auto 1rem;">
+          <div class="card px-5 py-5 fade-up" style="animation-delay:0.1s;border-top:2px solid var(--orange);">
+            <div style="display:flex;justify-content:center;margin-bottom:0.6rem;color:var(--orange);">${sunsetSVG}</div>
+            <p class="mono-label" style="margin-bottom:0.45rem;">Sunset</p>
+            <p style="font-family:var(--font-display);font-size:2rem;font-weight:400;letter-spacing:-0.02em;color:var(--text);line-height:1;">${sunsetStr}</p>
+          </div>
+          <div class="card px-5 py-5 fade-up" style="animation-delay:0.2s;border-top:2px solid var(--blue);">
+            <div style="display:flex;justify-content:center;margin-bottom:0.6rem;color:#7fbfff;">${sunriseSVG}</div>
+            <p class="mono-label" style="margin-bottom:0.45rem;">Sunrise</p>
+            <p style="font-family:var(--font-display);font-size:2rem;font-weight:400;letter-spacing:-0.02em;color:var(--text);line-height:1;">${sunriseStr}</p>
+          </div>
+        </div>
+
+        <div class="card px-5 py-3 fade-up mx-auto" style="max-width:450px;font-size:0.85rem;color:var(--muted);margin-bottom:1rem;animation-delay:0.3s;">
+          Daylight today — <span style="color:var(--text);font-weight:500;">${dayLenStr}</span>
+        </div>
+
+        ${nightPhasesHTML(lat, lng, now, times.sunset)}
+
+        <p class="fade-up mono-label" style="animation-delay:0.45s;">${dateStr}</p>
+      `;
+      setPlaceName(city);
+      showState('result');
+    }
+
+    function requestLocation(highAccuracy = true) {
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        showState('insecure'); return;
+      }
+      if (!navigator.geolocation) { showState('unavailable'); return; }
+      showState('loading');
+      document.getElementById('loading-msg')!.textContent = 'Locating your position…';
+      navigator.geolocation.getCurrentPosition(
+        (pos) => renderResult(pos.coords.latitude, pos.coords.longitude),
+        (err) => {
+          if (err.code === 1) showState('denied');
+          else if (err.code === 3) showState('timeout');
+          else showState('unavailable');
+        },
+        { enableHighAccuracy: highAccuracy, timeout: 12000, maximumAge: 60000 }
+      );
+    }
+
+    document.getElementById('btn-locate')!.addEventListener('click', () => requestLocation(true));
+    document.getElementById('btn-reload')!.addEventListener('click', () => location.reload());
+    document.getElementById('btn-retry-timeout')!.addEventListener('click', () => requestLocation(true));
+    document.getElementById('btn-retry-low')!.addEventListener('click', () => requestLocation(false));
+    document.getElementById('btn-retry-unavailable')!.addEventListener('click', () => requestLocation(true));
+  </script>
+
+</body>
+</html>
