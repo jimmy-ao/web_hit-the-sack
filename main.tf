@@ -41,6 +41,6 @@ module "hitthesack" {
   }
 
   waf = {
-    enabled = true
+    web_acl_arn = data.aws_wafv2_web_acl.cloudfront.arn
   }
 }
